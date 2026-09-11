@@ -1,0 +1,59 @@
+# Cloudflare Workers configuration for Yoga Fit with Meenu
+# Docs: https://developers.cloudflare.com/workers/wrangler/configuration/
+# Deployment adapter: @opennextjs/cloudflare (official Next.js -> Workers path)
+
+"$schema" = "node_modules/wrangler/config-schema.json"
+
+name = "yoga-fit-with-meenu"
+main = ".open-next/worker.js"
+compatibility_date = "2026-09-01"
+compatibility_flags = ["nodejs_compat", "nodejs_compat_populate_process_env"]
+
+[assets]
+directory = ".open-next/assets"
+binding = "ASSETS"
+
+# ---------------------------------------------------------------------------
+# D1 Database — create with: npx wrangler d1 create yoga-fit-db
+# Then paste the returned database_id below.
+# ---------------------------------------------------------------------------
+[[d1_databases]]
+binding = "DB"
+database_name = "yoga-fit-db"
+database_id = "1613bcea-0f1c-4329-bcf0-b9e3c7873a77"
+migrations_dir = "migrations"
+
+# ---------------------------------------------------------------------------
+# R2 Bucket — create with: npx wrangler r2 bucket create yoga-fit-media
+# Used for banner images/videos, blog images, testimonial photos, etc.
+# ---------------------------------------------------------------------------
+[[r2_buckets]]
+binding = "MEDIA"
+bucket_name = "yoga-fit-media"
+
+# ---------------------------------------------------------------------------
+# KV Namespace — used for login rate-limiting (brute-force protection).
+# Create with: npx wrangler kv namespace create RATE_LIMIT
+# ---------------------------------------------------------------------------
+[[kv_namespaces]]
+binding = "RATE_LIMIT"
+id = "b7f9b9dbaddd48f8946edf433cce503f"
+
+[vars]
+NEXT_PUBLIC_SITE_URL = "https://yogafitwithmeenu.online"
+NEXT_PUBLIC_SITE_NAME = "Yoga Fit with Meenu"
+NEXT_PUBLIC_PHONE = "+917678200212"
+NEXT_PUBLIC_WHATSAPP = "917678200212"
+NEXT_PUBLIC_EMAIL = "yoga@yogafitwithmeenu.online"
+# R2_PUBLIC_URL should point to your R2 custom domain or r2.dev URL.
+R2_PUBLIC_URL = "https://media.yogafitwithmeenu.online"
+
+# ---------------------------------------------------------------------------
+# Secrets (never put these here — set via `wrangler secret put <NAME>`):
+#   AUTH_SECRET            (32+ random chars — session signing)
+#   SESSION_SECRET         (32+ random chars — fallback session signing)
+#   TURNSTILE_SECRET_KEY   (optional — bot protection on contact form)
+# ---------------------------------------------------------------------------
+
+[observability]
+enabled = true

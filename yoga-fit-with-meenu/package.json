@@ -1,0 +1,54 @@
+{
+  "name": "yoga-fit-with-meenu",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Yoga Fit with Meenu - Yoga Classes in Delhi NCR. Production-ready Next.js site with Cloudflare Workers, D1, R2 and admin CMS.",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit",
+    "test": "echo \"Add tests with vitest/playwright\" && exit 0",
+    "db:migrate:local": "wrangler d1 migrations apply yoga-fit-db --local",
+    "db:migrate": "wrangler d1 migrations apply yoga-fit-db --remote",
+    "db:seed:local": "wrangler d1 execute yoga-fit-db --local --file=./scripts/seed.sql",
+    "db:seed": "wrangler d1 execute yoga-fit-db --remote --file=./scripts/seed.sql",
+    "create-admin:local": "wrangler d1 execute yoga-fit-db --local --file=./scripts/create-admin.sql",
+    "create-admin": "wrangler d1 execute yoga-fit-db --remote --file=./scripts/create-admin.sql",
+    "cf:login": "wrangler login",
+    "preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
+    "deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",
+    "cf-typegen": "wrangler types --env-interface CloudflareEnv cloudflare-env.d.ts"
+  },
+  "dependencies": {
+    "next": "^15.5.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "zod": "^3.24.0",
+    "bcryptjs": "^2.4.3",
+    "jose": "^5.9.0",
+    "clsx": "^2.1.1",
+    "tailwind-merge": "^2.6.0",
+    "lucide-react": "^0.469.0",
+    "date-fns": "^4.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@types/bcryptjs": "^2.4.6",
+    "typescript": "^5.7.0",
+    "eslint": "^9.17.0",
+    "eslint-config-next": "^15.5.0",
+    "tailwindcss": "^3.4.17",
+    "postcss": "^8.4.49",
+    "autoprefixer": "^10.4.20",
+    "wrangler": "^4.28.0",
+    "@opennextjs/cloudflare": "^1.3.0",
+    "@cloudflare/workers-types": "^5.20260910.1"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
