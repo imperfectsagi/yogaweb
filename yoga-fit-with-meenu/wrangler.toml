@@ -57,3 +57,7 @@ R2_PUBLIC_URL = ""
 
 [observability]
 enabled = true
+
+[[routes]]
+pattern = "yogafitwithmeenu.online"
+custom_domain = true
