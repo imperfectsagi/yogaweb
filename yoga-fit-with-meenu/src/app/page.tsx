@@ -133,15 +133,15 @@ export default async function HomePage() {
               </a>
             </div>
           </div>
+        </div>
 
-          {/* Banner is part of the hero (not a separate section below it),
-              and uses the full container-narrow width rather than being
-              constrained to the narrower text column above — so it reads
-              as one continuous hero, and the image has real room to show
-              its full composition instead of being squeezed. */}
-          <div className="mt-6">
-            <HomeBanner />
-          </div>
+        {/* Banner is part of the hero but rendered outside container-narrow
+            so it spans the FULL viewport width edge-to-edge, like a proper
+            hero banner, instead of being boxed into the narrow text column's
+            max-width. The banner's own component handles showing the
+            complete image/video (no cropping) and staying responsive. */}
+        <div className="mt-6">
+          <HomeBanner />
         </div>
       </section>
 
