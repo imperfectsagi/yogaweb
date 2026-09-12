@@ -111,17 +111,95 @@ export async function getPostBySlug(slug: string) {
 
 export async function getHomepageSections() {
   const db = getDb();
+  // Intentionally selects ALL sections (not just enabled ones) so the
+  // homepage can tell "disabled" apart from "not found" -- filtering to
+  // enabled=1 here would make a disabled section indistinguishable from a
+  // missing row, and the homepage's per-section visibility check needs to
+  // see the real enabled flag to hide it correctly.
   const { results } = await db
-    .prepare(
-      `SELECT * FROM homepage_sections WHERE enabled = 1 ORDER BY sort_order ASC`
-    )
+    .prepare(`SELECT * FROM homepage_sections ORDER BY sort_order ASC`)
     .all();
   return results || [];
 }
 
 export async function getTheme() {
   const db = getDb();
-  return db.prepare(`SELECT * FROM theme_settings WHERE id = 1`).first();
+  return db.prepare(`SELECT * FROM theme_settings WHERE id = 1`).first<{
+    id: number;
+    primary_color: string;
+    secondary_color: string;
+    accent_color: string;
+    background_color: string;
+    foreground_color: string;
+    muted_color: string;
+    border_color: string;
+    button_radius: string;
+    card_radius: string;
+    updated_at: string;
+  }>();
+}
+
+/** Converts "#RRGGBB" to "R G B" (space-separated channel triplet) so it can
+ * be dropped straight into the CSS custom properties globals.css expects
+ * (Tailwind's rgb(var(--x) / <alpha-value>) pattern needs bare channels,
+ * not a "#" hex string). Falls back to black on malformed input rather than
+ * throwing, since this runs during SSR of every page. */
+function hexToRgbTriplet(hex: string): string {
+  const match = /^#?([0-9a-fA-F]{6})$/.exec(hex);
+  if (!match) return "0 0 0";
+  const int = parseInt(match[1], 16);
+  const r = (int >> 16) & 255;
+  const g = (int >> 8) & 255;
+  const b = int & 255;
+  return `${r} ${g} ${b}`;
+}
+
+/** Builds the inline <style> CSS custom properties block for the current
+ * theme, falling back to the built-in defaults (matching globals.css) if
+ * no row exists yet or D1 isn't reachable. Used in the root layout so a
+ * theme change in the admin applies site-wide without a rebuild. */
+export async function getThemeCssVars(): Promise<string> {
+  const DEFAULTS = {
+    primary_color: "#2D5A4A",
+    secondary_color: "#8B7355",
+    accent_color: "#C4A484",
+    background_color: "#FAF8F5",
+    foreground_color: "#1A1A1A",
+    muted_color: "#6B7280",
+    border_color: "#E5E0D8",
+    button_radius: "0.5rem",
+    card_radius: "0.75rem",
+  };
+
+  let theme: typeof DEFAULTS = DEFAULTS;
+  try {
+    const row = await getTheme();
+    if (row) {
+      theme = {
+        primary_color: row.primary_color || DEFAULTS.primary_color,
+        secondary_color: row.secondary_color || DEFAULTS.secondary_color,
+        accent_color: row.accent_color || DEFAULTS.accent_color,
+        background_color: row.background_color || DEFAULTS.background_color,
+        foreground_color: row.foreground_color || DEFAULTS.foreground_color,
+        muted_color: row.muted_color || DEFAULTS.muted_color,
+        border_color: row.border_color || DEFAULTS.border_color,
+        button_radius: row.button_radius || DEFAULTS.button_radius,
+        card_radius: row.card_radius || DEFAULTS.card_radius,
+      };
+    }
+  } catch {
+    // D1 unreachable (e.g. plain `next dev`) — fall back to defaults.
+  }
+
+  return `:root{--color-primary:${hexToRgbTriplet(theme.primary_color)};--color-secondary:${hexToRgbTriplet(
+    theme.secondary_color
+  )};--color-accent:${hexToRgbTriplet(theme.accent_color)};--color-background:${hexToRgbTriplet(
+    theme.background_color
+  )};--color-foreground:${hexToRgbTriplet(theme.foreground_color)};--color-muted:${hexToRgbTriplet(
+    theme.muted_color
+  )};--color-border:${hexToRgbTriplet(theme.border_color)};--radius-button:${theme.button_radius};--radius-card:${
+    theme.card_radius
+  };}`;
 }
 
 export async function getFaqs(homepageOnly = false) {
@@ -161,6 +239,9 @@ export type BannerSettings = {
   url: string | null;
   posterUrl: string | null; // poster/thumbnail for video banners
   altText: string | null;
+  focalX: number; // 0-100, horizontal focal point for object-position
+  focalY: number; // 0-100, vertical focal point for object-position
+  fit: "cover" | "contain";
 };
 
 export async function getBannerSettings(): Promise<BannerSettings> {
@@ -168,7 +249,7 @@ export async function getBannerSettings(): Promise<BannerSettings> {
   const { results } = await db
     .prepare(
       `SELECT key, value FROM site_settings WHERE key IN
-       ('banner_type','banner_media_id','banner_url','banner_poster_url','banner_alt_text')`
+       ('banner_type','banner_media_id','banner_url','banner_poster_url','banner_alt_text','banner_focal_x','banner_focal_y','banner_fit')`
     )
     .all<{ key: string; value: string }>();
   const map = Object.fromEntries((results || []).map((r) => [r.key, r.value]));
@@ -178,6 +259,9 @@ export async function getBannerSettings(): Promise<BannerSettings> {
     url: map.banner_url || null,
     posterUrl: map.banner_poster_url || null,
     altText: map.banner_alt_text || null,
+    focalX: map.banner_focal_x ? Number(map.banner_focal_x) : 50,
+    focalY: map.banner_focal_y ? Number(map.banner_focal_y) : 50,
+    fit: (map.banner_fit as "cover" | "contain") || "cover",
   };
 }
 
@@ -189,6 +273,9 @@ export async function setBannerSettings(banner: BannerSettings) {
     ["banner_url", banner.url || ""],
     ["banner_poster_url", banner.posterUrl || ""],
     ["banner_alt_text", banner.altText || ""],
+    ["banner_focal_x", String(banner.focalX ?? 50)],
+    ["banner_focal_y", String(banner.focalY ?? 50)],
+    ["banner_fit", banner.fit || "cover"],
   ];
   const stmts = entries.map(([key, value]) =>
     db
@@ -316,4 +403,58 @@ export async function listMedia(limit = 50) {
     .bind(limit)
     .all();
   return results || [];
+}
+
+export async function deleteMediaRecord(id: string) {
+  const db = getDb();
+  const row = await db
+    .prepare(`SELECT r2_key FROM media WHERE id = ?`)
+    .bind(id)
+    .first<{ r2_key: string }>();
+  await db.prepare(`DELETE FROM media WHERE id = ?`).bind(id).run();
+  return row?.r2_key || null;
+}
+
+/** Finds every place a media URL is currently referenced, so the admin can
+ * be warned before deleting an asset that's still in use. */
+export async function findMediaUsage(url: string): Promise<string[]> {
+  const db = getDb();
+  const usages: string[] = [];
+
+  const bannerRow = await db
+    .prepare(`SELECT value FROM site_settings WHERE key = 'banner_url'`)
+    .first<{ value: string }>();
+  if (bannerRow?.value === url) usages.push("Homepage banner");
+
+  const services = await db
+    .prepare(`SELECT name FROM services WHERE featured_image = ? OR og_image = ?`)
+    .bind(url, url)
+    .all<{ name: string }>();
+  for (const s of services.results || []) usages.push(`Service: ${s.name}`);
+
+  const posts = await db
+    .prepare(`SELECT title FROM blog_posts WHERE featured_image = ? OR og_image = ?`)
+    .bind(url, url)
+    .all<{ title: string }>();
+  for (const p of posts.results || []) usages.push(`Blog post: ${p.title}`);
+
+  const sections = await db
+    .prepare(`SELECT section_key FROM homepage_sections WHERE image_url = ?`)
+    .bind(url)
+    .all<{ section_key: string }>();
+  for (const s of sections.results || []) usages.push(`Homepage section: ${s.section_key}`);
+
+  const testimonials = await db
+    .prepare(`SELECT name FROM testimonials WHERE photo_url = ?`)
+    .bind(url)
+    .all<{ name: string }>();
+  for (const t of testimonials.results || []) usages.push(`Testimonial: ${t.name}`);
+
+  const seo = await db
+    .prepare(`SELECT id FROM seo_settings WHERE id = 1 AND (default_og_image = ? OR logo_url = ?)`)
+    .bind(url, url)
+    .first();
+  if (seo) usages.push("Site SEO / logo settings");
+
+  return usages;
 }

@@ -8,32 +8,74 @@ type Banner = {
   url: string | null;
   posterUrl: string | null;
   altText: string | null;
+  focalX: number;
+  focalY: number;
+  fit: "cover" | "contain";
 };
 
 const MAX_IMAGE_MB = 5;
 const MAX_VIDEO_MB = 50;
 
+const DEFAULT_BANNER: Banner = {
+  type: null,
+  mediaId: null,
+  url: null,
+  posterUrl: null,
+  altText: null,
+  focalX: 50,
+  focalY: 50,
+  fit: "cover",
+};
+
 export function BannerManager() {
-  const [banner, setBanner] = useState<Banner | null>(null);
+  const [banner, setBanner] = useState<Banner>(DEFAULT_BANNER);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [altText, setAltText] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const previewRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     fetch("/api/admin/banner")
       .then((res) => res.json())
       .then((data) => {
         if (data.banner) {
-          setBanner(data.banner);
+          setBanner({ ...DEFAULT_BANNER, ...data.banner });
           setAltText(data.banner.altText || "");
         }
       })
       .catch(() => setError("Could not load current banner."))
       .finally(() => setLoading(false));
   }, []);
+
+  async function persistBanner(next: Banner) {
+    setError(null);
+    setSuccess(null);
+    setSaving(true);
+    try {
+      const res = await fetch("/api/admin/banner", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(next),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(data.error || "Could not save banner settings.");
+        return false;
+      }
+      setBanner(next);
+      setSuccess("Banner updated. It's now live on the homepage.");
+      return true;
+    } catch {
+      setError("Network error. Please try again.");
+      return false;
+    } finally {
+      setSaving(false);
+    }
+  }
 
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -80,23 +122,12 @@ export function BannerManager() {
         url: uploadData.media.url,
         posterUrl: null,
         altText: altText || null,
+        focalX: 50,
+        focalY: 50,
+        fit: "cover",
       };
 
-      const saveRes = await fetch("/api/admin/banner", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(newBanner),
-      });
-      const saveData = await saveRes.json().catch(() => ({}));
-
-      if (!saveRes.ok) {
-        setError(saveData.error || "Uploaded, but could not save banner settings.");
-        setUploading(false);
-        return;
-      }
-
-      setBanner(newBanner);
-      setSuccess("Banner updated. It's now live on the homepage.");
+      await persistBanner(newBanner);
     } catch {
       setError("Network error during upload. Please try again.");
     } finally {
@@ -105,26 +136,21 @@ export function BannerManager() {
     }
   }
 
-  async function handleAltTextSave() {
-    if (!banner?.url || !banner.type || !banner.mediaId) return;
-    setError(null);
-    setSuccess(null);
-    try {
-      const res = await fetch("/api/admin/banner", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...banner, altText }),
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        setError(data.error || "Could not save description.");
-        return;
-      }
-      setBanner({ ...banner, altText });
-      setSuccess("Description saved.");
-    } catch {
-      setError("Network error. Please try again.");
-    }
+  function handlePreviewClick(e: React.MouseEvent<HTMLDivElement>) {
+    if (!banner.url) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = Math.round(((e.clientX - rect.left) / rect.width) * 100);
+    const y = Math.round(((e.clientY - rect.top) / rect.height) * 100);
+    setBanner((b) => ({
+      ...b,
+      focalX: Math.max(0, Math.min(100, x)),
+      focalY: Math.max(0, Math.min(100, y)),
+    }));
+  }
+
+  async function handleRemoveBanner() {
+    await persistBanner(DEFAULT_BANNER);
+    setAltText("");
   }
 
   if (loading) {
@@ -144,16 +170,70 @@ export function BannerManager() {
         </div>
       )}
 
-      {banner?.url ? (
+      {banner.url ? (
         <div>
           <p className="text-sm font-medium mb-2">Current banner</p>
-          <div className="rounded-card overflow-hidden border border-border bg-gray-100">
+          <div
+            ref={previewRef}
+            onClick={handlePreviewClick}
+            className="relative rounded-card overflow-hidden border border-border bg-gray-100 cursor-crosshair select-none"
+            title="Click anywhere to set the focal point"
+          >
             {banner.type === "video" ? (
-              <video src={banner.url} className="w-full h-48 object-cover" muted loop playsInline controls />
+              <video
+                src={banner.url}
+                className="w-full h-48 pointer-events-none"
+                style={{ objectFit: banner.fit, objectPosition: `${banner.focalX}% ${banner.focalY}%` }}
+                muted
+                loop
+                playsInline
+              />
             ) : (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={banner.url} alt={banner.altText || ""} className="w-full h-48 object-cover" />
+              <img
+                src={banner.url}
+                alt={banner.altText || ""}
+                className="w-full h-48 pointer-events-none"
+                style={{ objectFit: banner.fit, objectPosition: `${banner.focalX}% ${banner.focalY}%` }}
+              />
             )}
+            {/* Focal point marker */}
+            <div
+              className="absolute w-4 h-4 -ml-2 -mt-2 rounded-full border-2 border-white bg-primary shadow pointer-events-none"
+              style={{ left: `${banner.focalX}%`, top: `${banner.focalY}%` }}
+            />
+          </div>
+          <p className="text-xs text-muted mt-1">
+            Click anywhere on the image to set the focal point (the part that stays visible when the
+            banner is cropped on mobile). Current: {banner.focalX}%, {banner.focalY}%
+          </p>
+
+          <div className="mt-4 flex flex-wrap items-center gap-3">
+            <label className="text-sm font-medium">Crop mode</label>
+            <select
+              value={banner.fit}
+              onChange={(e) => setBanner((b) => ({ ...b, fit: e.target.value as "cover" | "contain" }))}
+              className="rounded border border-border px-2 py-1.5 text-sm"
+            >
+              <option value="cover">Cover (fill area, crop edges)</option>
+              <option value="contain">Contain (show whole image, may letterbox)</option>
+            </select>
+            <button
+              type="button"
+              onClick={() => persistBanner(banner)}
+              disabled={saving}
+              className="btn-primary text-sm py-1.5 px-4"
+            >
+              {saving ? "Saving…" : "Save position & crop"}
+            </button>
+            <button
+              type="button"
+              onClick={handleRemoveBanner}
+              disabled={saving}
+              className="text-sm text-red-600 hover:underline ml-auto"
+            >
+              Remove banner
+            </button>
           </div>
         </div>
       ) : (
@@ -171,7 +251,7 @@ export function BannerManager() {
           accept="image/jpeg,image/png,image/webp,image/avif,video/mp4,video/webm"
           onChange={handleFileChange}
           disabled={uploading}
-          className="w-full text-sm rounded border border-border px-3 py-2"
+          className="w-full text-sm rounded border border-border px-3 py-3 sm:py-2"
         />
         <p className="text-xs text-muted mt-1">
           Images: JPG, PNG, WebP or AVIF, up to {MAX_IMAGE_MB} MB. Videos: MP4 or WebM, up to {MAX_VIDEO_MB} MB.
@@ -184,19 +264,19 @@ export function BannerManager() {
         <label htmlFor="alt-text" className="block text-sm font-medium mb-1">
           Description (for accessibility &amp; SEO)
         </label>
-        <div className="flex gap-2">
+        <div className="flex flex-col sm:flex-row gap-2">
           <input
             id="alt-text"
             type="text"
             value={altText}
             onChange={(e) => setAltText(e.target.value)}
             placeholder="e.g. Meenu guiding a group yoga class outdoors"
-            className="flex-1 rounded border border-border px-3 py-2 text-sm"
+            className="flex-1 rounded border border-border px-3 py-2.5 sm:py-2 text-sm"
           />
           <button
             type="button"
-            onClick={handleAltTextSave}
-            disabled={!banner?.url}
+            onClick={() => persistBanner({ ...banner, altText })}
+            disabled={!banner.url || saving}
             className="btn-secondary text-sm"
           >
             Save

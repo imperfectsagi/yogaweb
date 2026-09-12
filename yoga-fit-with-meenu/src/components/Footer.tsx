@@ -1,16 +1,69 @@
 import Link from "next/link";
 import { SITE } from "@/lib/utils";
+import { getActiveNavigation, getAllSiteSettings } from "@/lib/cms";
 
-export function Footer() {
+const FALLBACK_FOOTER = [
+  { id: "f-services", href: "/services", label: "Services" },
+  { id: "f-pricing", href: "/pricing", label: "Pricing" },
+  { id: "f-blog", href: "/blog", label: "Blog" },
+  { id: "f-faq", href: "/faq", label: "FAQ" },
+  { id: "f-privacy", href: "/privacy-policy", label: "Privacy Policy" },
+  { id: "f-terms", href: "/terms-and-conditions", label: "Terms" },
+];
+
+export async function Footer() {
+  let footerLinks: { id: string; href: string; label: string; is_external?: number }[] = FALLBACK_FOOTER;
+  let socials: { instagram?: string; facebook?: string; youtube?: string } = {};
+
+  try {
+    const items = await getActiveNavigation("footer");
+    if (items.length) {
+      footerLinks = items.map((i) => ({ id: i.id, href: i.url, label: i.label, is_external: i.is_external }));
+    }
+  } catch {
+    footerLinks = FALLBACK_FOOTER;
+  }
+
+  try {
+    const settings = await getAllSiteSettings();
+    socials = {
+      instagram: settings.social_instagram || undefined,
+      facebook: settings.social_facebook || undefined,
+      youtube: settings.social_youtube || undefined,
+    };
+  } catch {
+    socials = {};
+  }
+
+  const hasSocials = socials.instagram || socials.facebook || socials.youtube;
+
   return (
     <footer className="border-t border-border bg-primary/5 mt-auto">
       <div className="container-narrow py-12 grid gap-8 md:grid-cols-3">
         <div>
           <p className="font-semibold text-primary text-lg">{SITE.name}</p>
           <p className="mt-2 text-sm text-muted">
-            Yoga Classes in Delhi NCR. Improve movement, flexibility, strength,
-            mindfulness and wellbeing.
+            Yoga Classes in Delhi NCR. Improve movement, flexibility, strength, mindfulness and wellbeing.
           </p>
+          {hasSocials && (
+            <div className="mt-4 flex gap-3 text-sm">
+              {socials.instagram && (
+                <a href={socials.instagram} target="_blank" rel="noopener noreferrer" className="text-muted hover:text-primary">
+                  Instagram
+                </a>
+              )}
+              {socials.facebook && (
+                <a href={socials.facebook} target="_blank" rel="noopener noreferrer" className="text-muted hover:text-primary">
+                  Facebook
+                </a>
+              )}
+              {socials.youtube && (
+                <a href={socials.youtube} target="_blank" rel="noopener noreferrer" className="text-muted hover:text-primary">
+                  YouTube
+                </a>
+              )}
+            </div>
+          )}
         </div>
 
         <div>
@@ -27,8 +80,7 @@ export function Footer() {
               </a>
             </li>
             <li>
-              {SITE.address.street}, {SITE.address.city}, {SITE.address.region}{" "}
-              {SITE.address.postal}
+              {SITE.address.street}, {SITE.address.city}, {SITE.address.region} {SITE.address.postal}
             </li>
           </ul>
         </div>
@@ -36,36 +88,13 @@ export function Footer() {
         <div>
           <p className="font-medium mb-3">Explore</p>
           <ul className="space-y-2 text-sm text-muted">
-            <li>
-              <Link href="/services" className="hover:text-foreground">
-                Services
-              </Link>
-            </li>
-            <li>
-              <Link href="/pricing" className="hover:text-foreground">
-                Pricing
-              </Link>
-            </li>
-            <li>
-              <Link href="/blog" className="hover:text-foreground">
-                Blog
-              </Link>
-            </li>
-            <li>
-              <Link href="/faq" className="hover:text-foreground">
-                FAQ
-              </Link>
-            </li>
-            <li>
-              <Link href="/privacy-policy" className="hover:text-foreground">
-                Privacy Policy
-              </Link>
-            </li>
-            <li>
-              <Link href="/terms-and-conditions" className="hover:text-foreground">
-                Terms
-              </Link>
-            </li>
+            {footerLinks.map((link) => (
+              <li key={link.id}>
+                <Link href={link.href} className="hover:text-foreground">
+                  {link.label}
+                </Link>
+              </li>
+            ))}
           </ul>
         </div>
       </div>

@@ -1,5 +1,10 @@
 # Deployment Guide — Yoga Fit with Meenu (Cloudflare)
 
+> **Updated build:** if you're deploying the CMS update (banner fix +
+> full admin CMS), also read `CMS_UPDATE_GUIDE.md` — it covers the one
+> extra migration step and what's new. This file still covers the base
+> account/wrangler/secrets setup and remains accurate.
+
 Follow these steps in order, in GitHub Codespaces (or any terminal with Node.js 20+).
 Each command is copy-pasteable. Where you need to paste a value back into a file, it's called out clearly.
 
