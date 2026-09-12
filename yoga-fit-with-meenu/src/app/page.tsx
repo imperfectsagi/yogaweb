@@ -3,6 +3,10 @@ import Image from "next/image";
 import { SITE, whatsappUrl } from "@/lib/utils";
 import { localBusinessJsonLd } from "@/lib/seo";
 import { HomeBanner } from "@/components/HomeBanner";
+import { Header } from "@/components/Header";
+import { Footer } from "@/components/Footer";
+import { MobileCTA } from "@/components/MobileCTA";
+import { FaqAccordion } from "@/components/FaqAccordion";
 import {
   getHomepageSections,
   getPublishedServices,
@@ -11,13 +15,6 @@ import {
   getPublishedPosts,
 } from "@/lib/db";
 import { getPublishedTestimonials } from "@/lib/cms";
-
-// The banner and several sections are admin-managed and stored in D1, so the
-// homepage is rendered per-request (via the Worker) rather than statically
-// at build time. This keeps content up to date immediately after an admin
-// saves a change, while Cloudflare's edge cache/CDN still keeps repeat
-// views fast.
-export const dynamic = "force-dynamic";
 
 const freeClassMsg = "Hi Meenu, I would like to attend a free yoga class. Please share the details.";
 
@@ -108,32 +105,41 @@ export default async function HomePage() {
 
   return (
     <>
+      <Header />
+      <main className="flex-1 pb-20 md:pb-0">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(lb) }} />
 
       {/* Hero */}
       <section className="section bg-primary/5">
-        <div className="container-narrow text-center max-w-3xl mx-auto">
-          <p className="text-sm font-medium text-primary mb-3 tracking-wide uppercase">Yoga Classes in Delhi NCR</p>
-          <h1 className="text-3xl sm:text-4xl md:text-5xl font-semibold text-foreground leading-tight">
-            {hero?.heading || "Yoga Fit with Meenu"}
-          </h1>
-          <p className="mt-4 text-lg text-muted max-w-2xl mx-auto">
-            {hero?.description ||
-              "Improve movement, flexibility, strength, mindfulness and general wellbeing through yoga. Group, personal and online classes available."}
-          </p>
-          <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-            <a href={whatsappUrl(SITE.whatsapp, freeClassMsg)} target="_blank" rel="noopener noreferrer" className="btn-primary">
-              {hero?.cta_text || "Book a Free Class"}
-            </a>
-            <Link href="/services" className="btn-secondary">
-              View Services
-            </Link>
-            <a href={`tel:${SITE.phone}`} className="btn-secondary">
-              Call {SITE.phone}
-            </a>
+        <div className="container-narrow">
+          <div className="text-center max-w-3xl mx-auto">
+            <p className="text-sm font-medium text-primary mb-3 tracking-wide uppercase">Yoga Classes in Delhi NCR</p>
+            <h1 className="text-3xl sm:text-4xl md:text-5xl font-semibold text-foreground leading-tight">
+              {hero?.heading || "Yoga Fit with Meenu"}
+            </h1>
+            <p className="mt-4 text-lg text-muted max-w-2xl mx-auto">
+              {hero?.description ||
+                "Improve movement, flexibility, strength, mindfulness and general wellbeing through yoga. Group, personal and online classes available."}
+            </p>
+            <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+              <a href={whatsappUrl(SITE.whatsapp, freeClassMsg)} target="_blank" rel="noopener noreferrer" className="btn-primary">
+                {hero?.cta_text || "Book a Free Class"}
+              </a>
+              <Link href="/services" className="btn-secondary">
+                View Services
+              </Link>
+              <a href={`tel:${SITE.phone}`} className="btn-secondary">
+                Call {SITE.phone}
+              </a>
+            </div>
           </div>
 
-          <div className="mt-10">
+          {/* Banner is part of the hero (not a separate section below it),
+              and uses the full container-narrow width rather than being
+              constrained to the narrower text column above — so it reads
+              as one continuous hero, and the image has real room to show
+              its full composition instead of being squeezed. */}
+          <div className="mt-6">
             <HomeBanner />
           </div>
         </div>
@@ -271,14 +277,7 @@ export default async function HomePage() {
         <section className="section">
           <div className="container-narrow max-w-3xl">
             <h2 className="text-2xl md:text-3xl text-center mb-10">{faqSection?.heading || "Frequently Asked Questions"}</h2>
-            <div className="space-y-6">
-              {faqs.map((f) => (
-                <div key={f.id} className="border-b border-border pb-6">
-                  <h3 className="text-lg font-medium mb-2">{f.question}</h3>
-                  <p className="text-muted text-sm leading-relaxed">{f.answer}</p>
-                </div>
-              ))}
-            </div>
+            <FaqAccordion faqs={faqs} />
             <div className="text-center mt-8">
               <Link href="/faq" className="btn-secondary">
                 All FAQs
@@ -357,6 +356,9 @@ export default async function HomePage() {
           </div>
         </section>
       )}
+      </main>
+      <Footer />
+      <MobileCTA />
     </>
   );
 }
