@@ -191,7 +191,7 @@ export default async function HomePage() {
                   View Services
                 </Link>
                 <a href={`tel:${SITE.phone}`} className={hasBanner ? "btn-secondary bg-white/95 hover:bg-white border-white/95" : "btn-secondary"}>
-                  Call {SITE.phone}
+                  Call
                 </a>
               </div>
             </div>
