@@ -46,7 +46,7 @@ NEXT_PUBLIC_PHONE = "+917678200212"
 NEXT_PUBLIC_WHATSAPP = "917678200212"
 NEXT_PUBLIC_EMAIL = "yoga@yogafitwithmeenu.online"
 # R2_PUBLIC_URL should point to your R2 custom domain or r2.dev URL.
-R2_PUBLIC_URL = "https://media.yogafitwithmeenu.online"
+R2_PUBLIC_URL = ""
 
 # ---------------------------------------------------------------------------
 # Secrets (never put these here — set via `wrangler secret put <NAME>`):

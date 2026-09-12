@@ -44,7 +44,7 @@ export async function HomeBanner() {
           style={{ objectFit, objectPosition }}
           loading="lazy"
           sizes="(max-width: 768px) 100vw, 1200px"
-          unoptimized={objectFit === "contain"}
+          unoptimized
         />
       )}
     </div>

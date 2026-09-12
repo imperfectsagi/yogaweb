@@ -132,12 +132,11 @@ export default async function HomePage() {
               Call {SITE.phone}
             </a>
           </div>
-        </div>
-      </section>
 
-      {/* Banner (image or video, admin-managed) */}
-      <section className="container-narrow -mt-6 relative z-10">
-        <HomeBanner />
+          <div className="mt-10">
+            <HomeBanner />
+          </div>
+        </div>
       </section>
 
       {/* Benefits */}
