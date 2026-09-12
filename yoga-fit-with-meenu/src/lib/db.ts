@@ -333,11 +333,12 @@ export async function getBannerSettings(): Promise<BannerSettings> {
     altText: map.banner_alt_text || null,
     focalX: map.banner_focal_x ? Number(map.banner_focal_x) : 50,
     focalY: map.banner_focal_y ? Number(map.banner_focal_y) : 50,
-    // Defaults to "contain" (show the full image) for any banner saved
-    // before this field existed in D1, so an already-live banner switches
-    // to the non-cropping behavior automatically rather than staying
-    // cropped until an admin happens to resave it.
-    fit: (map.banner_fit as "cover" | "contain") || "contain",
+    // Defaults to "cover" (fill the full-width hero edge-to-edge, no gray
+    // gaps) for any banner saved before this field existed in D1, matching
+    // the homepage's default rendering. Admins can switch an individual
+    // banner to "contain" from Admin → Homepage Banner if they'd rather
+    // show the complete image with letterboxing instead.
+    fit: (map.banner_fit as "cover" | "contain") || "cover",
   };
 }
 

@@ -1,7 +1,18 @@
 import Image from "next/image";
 import { getBannerSettings } from "@/lib/db";
 
-export async function HomeBanner() {
+type HomeBannerProps = {
+  // When true, the banner fills its positioned parent edge-to-edge
+  // (absolute inset-0) instead of sizing itself from the media's own
+  // aspect ratio. Used ONLY on the homepage, where the banner is the
+  // full-bleed background of the hero block (header + hero text overlaid
+  // on top of it). Default (false) keeps the original standalone
+  // behavior — a self-sized block that renders its own height — in case
+  // HomeBanner is ever used anywhere else.
+  background?: boolean;
+};
+
+export async function HomeBanner({ background = false }: HomeBannerProps = {}) {
   let banner: Awaited<ReturnType<typeof getBannerSettings>> | null = null;
   try {
     banner = await getBannerSettings();
@@ -24,25 +35,36 @@ export async function HomeBanner() {
   // letterboxing instead of any cropping.
   const objectFit = banner.fit === "contain" ? "contain" : "cover";
 
-  // Full-width hero banner: the wrapper spans the entire viewport (it's
-  // rendered outside container-narrow by the homepage), with no side
-  // margins, rounded corners or borders — like a real hero banner, not a
-  // boxed-in card. "cover" fills a tall responsive band edge-to-edge
-  // (height scales with viewport width so the crop stays proportional on
-  // any screen). "contain" instead lets the element size itself from the
-  // image/video's own intrinsic aspect ratio (h-auto), so the browser
-  // letterboxes automatically instead of ever cropping content.
-  const frameClass =
-    objectFit === "contain"
+  // Full-width hero banner: the wrapper spans the entire viewport, with
+  // no side margins, rounded corners or borders — like a real hero
+  // banner, not a boxed-in card. In `background` mode the media fills its
+  // absolutely-positioned parent completely (the parent sets the hero's
+  // height). In standalone mode, "cover" fills a tall responsive band
+  // edge-to-edge (height scales with viewport width so the crop stays
+  // proportional on any screen), and "contain" instead lets the element
+  // size itself from the image/video's own intrinsic aspect ratio
+  // (h-auto), so the browser letterboxes automatically instead of ever
+  // cropping content.
+  const frameClass = background
+    ? "block w-full h-full"
+    : objectFit === "contain"
       ? "block w-full h-auto max-h-[85vh]"
       : "block w-full h-[60vw] max-h-[600px] min-h-[280px] sm:h-[42vw] sm:min-h-[340px] md:h-[36vw]";
 
+  const wrapperClass = background
+    ? "absolute inset-0 w-full h-full bg-gray-100 overflow-hidden"
+    : "w-full bg-gray-100 flex items-center justify-center overflow-hidden";
+
   return (
-    <div className="w-full bg-gray-100 flex items-center justify-center overflow-hidden">
+    <div className={wrapperClass}>
       {banner.type === "video" ? (
         // preload="none" + no autoplay keeps initial page weight small; the
         // browser only fetches video data once the user presses play, and
         // the poster image (if set) gives an instant visual with zero cost.
+        // No `controls` in background mode: the header/hero text float on
+        // top of the video, so native controls would sit underneath them
+        // and be unreachable — the poster frame (or first frame) still
+        // displays correctly either way.
         <video
           src={banner.url}
           poster={banner.posterUrl || undefined}
@@ -51,8 +73,9 @@ export async function HomeBanner() {
           muted
           loop
           playsInline
-          controls
-          preload="none"
+          controls={!background}
+          autoPlay={background}
+          preload={background ? "auto" : "none"}
           aria-label={banner.altText || "Yoga Fit with Meenu"}
         />
       ) : (
@@ -62,8 +85,9 @@ export async function HomeBanner() {
           width={1920}
           height={1080}
           className={frameClass}
-          style={{ objectFit, objectPosition, width: "100%", height: "auto" }}
-          loading="lazy"
+          style={{ objectFit, objectPosition, width: "100%", height: background ? "100%" : "auto" }}
+          loading={background ? "eager" : "lazy"}
+          priority={background}
           sizes="100vw"
           unoptimized
         />

@@ -24,9 +24,11 @@ const DEFAULT_BANNER: Banner = {
   altText: null,
   focalX: 50,
   focalY: 50,
-  // "contain" shows the complete uploaded image by default (no cropping);
-  // admins can switch to "cover" below if they want an edge-to-edge crop.
-  fit: "contain",
+  // "cover" fills the full-width hero edge-to-edge by default (no gray
+  // gaps), matching a typical professional hero banner; admins can switch
+  // to "contain" below if they want to show the complete image instead,
+  // with letterboxing where the aspect ratio doesn't match.
+  fit: "cover",
 };
 
 export function BannerManager() {
@@ -126,7 +128,7 @@ export function BannerManager() {
         altText: altText || null,
         focalX: 50,
         focalY: 50,
-        fit: "contain",
+        fit: "cover",
       };
 
       await persistBanner(newBanner);
@@ -217,8 +219,8 @@ export function BannerManager() {
               onChange={(e) => setBanner((b) => ({ ...b, fit: e.target.value as "cover" | "contain" }))}
               className="rounded border border-border px-2 py-1.5 text-sm"
             >
-              <option value="contain">Show full image (recommended — may letterbox)</option>
-              <option value="cover">Fill area (crops edges to remove empty space)</option>
+              <option value="cover">Fill full-width banner (recommended — crops edges, use focal point to keep the subject in view)</option>
+              <option value="contain">Show complete image (no cropping — may letterbox)</option>
             </select>
             <button
               type="button"

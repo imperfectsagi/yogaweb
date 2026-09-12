@@ -13,6 +13,7 @@ import {
   getActivePackages,
   getFaqs,
   getPublishedPosts,
+  getBannerSettings,
 } from "@/lib/db";
 import { getPublishedTestimonials } from "@/lib/cms";
 
@@ -91,6 +92,18 @@ export default async function HomePage() {
     testimonials = [];
   }
 
+  // Whether a homepage banner is currently set — determines whether the
+  // hero renders as a full-bleed photo/video background (light text,
+  // overlaid header) or, with no banner uploaded, as the original plain
+  // hero (dark text on the site's background color, normal header row).
+  let hasBanner = false;
+  try {
+    const banner = await getBannerSettings();
+    hasBanner = Boolean(banner?.url && banner.type);
+  } catch {
+    hasBanner = false;
+  }
+
   const hero = byKey("hero");
   const benefits = byKey("benefits");
   const servicesSection = byKey("services");
@@ -105,43 +118,84 @@ export default async function HomePage() {
 
   return (
     <>
-      <Header />
+      {/* When no banner is set, Header renders exactly as it always has:
+          its own row, before main, normal sticky solid header — no
+          structural change from the original page for this common case.
+          Only when a banner IS set does Header move to float on top of
+          the full-bleed hero image instead (see inside the hero section
+          below), since only then is there a photo behind it to float on. */}
+      {!hasBanner && <Header />}
       <main className="flex-1 pb-20 md:pb-0">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(lb) }} />
 
-      {/* Hero */}
-      <section className="section bg-primary/5">
-        <div className="container-narrow">
-          <div className="text-center max-w-3xl mx-auto">
-            <p className="text-sm font-medium text-primary mb-3 tracking-wide uppercase">Yoga Classes in Delhi NCR</p>
-            <h1 className="text-3xl sm:text-4xl md:text-5xl font-semibold text-foreground leading-tight">
-              {hero?.heading || "Yoga Fit with Meenu"}
-            </h1>
-            <p className="mt-4 text-lg text-muted max-w-2xl mx-auto">
-              {hero?.description ||
-                "Improve movement, flexibility, strength, mindfulness and general wellbeing through yoga. Group, personal and online classes available."}
-            </p>
-            <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
-              <a href={whatsappUrl(SITE.whatsapp, freeClassMsg)} target="_blank" rel="noopener noreferrer" className="btn-primary">
-                {hero?.cta_text || "Book a Free Class"}
-              </a>
-              <Link href="/services" className="btn-secondary">
-                View Services
-              </Link>
-              <a href={`tel:${SITE.phone}`} className="btn-secondary">
-                Call {SITE.phone}
-              </a>
+      {/* Hero. When a banner is set (hasBanner), the image/video is a
+          full-bleed background filling this entire block (behind the
+          header too), with the header and hero text/buttons overlaid on
+          top in light colors with a text-shadow for readability over a
+          photo — the standard hero-banner layout. With no banner set,
+          this renders exactly as the original plain hero: normal-height
+          section, dark text on the site's background tint — unchanged
+          from before. */}
+      <section
+        className={
+          hasBanner
+            ? "relative isolate overflow-hidden min-h-[520px] sm:min-h-[600px] md:min-h-[680px] flex flex-col bg-primary/5"
+            : "section bg-primary/5"
+        }
+      >
+        {hasBanner && (
+          <>
+            <div className="absolute inset-0 -z-10">
+              <HomeBanner background />
+            </div>
+            <Header overlay />
+          </>
+        )}
+
+        <div className={hasBanner ? "relative flex-1 flex items-center" : undefined}>
+          <div className={hasBanner ? "container-narrow py-10" : "container-narrow"}>
+            <div className="text-center max-w-3xl mx-auto">
+              <p
+                className={
+                  hasBanner
+                    ? "text-sm font-medium text-white mb-3 tracking-wide uppercase [text-shadow:0_1px_4px_rgb(0_0_0_/_0.6)]"
+                    : "text-sm font-medium text-primary mb-3 tracking-wide uppercase"
+                }
+              >
+                Yoga Classes in Delhi NCR
+              </p>
+              <h1
+                className={
+                  hasBanner
+                    ? "text-3xl sm:text-4xl md:text-5xl font-semibold text-white leading-tight [text-shadow:0_2px_8px_rgb(0_0_0_/_0.6)]"
+                    : "text-3xl sm:text-4xl md:text-5xl font-semibold text-foreground leading-tight"
+                }
+              >
+                {hero?.heading || "Yoga Fit with Meenu"}
+              </h1>
+              <p
+                className={
+                  hasBanner
+                    ? "mt-4 text-lg text-white/95 max-w-2xl mx-auto [text-shadow:0_1px_4px_rgb(0_0_0_/_0.6)]"
+                    : "mt-4 text-lg text-muted max-w-2xl mx-auto"
+                }
+              >
+                {hero?.description ||
+                  "Improve movement, flexibility, strength, mindfulness and general wellbeing through yoga. Group, personal and online classes available."}
+              </p>
+              <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+                <a href={whatsappUrl(SITE.whatsapp, freeClassMsg)} target="_blank" rel="noopener noreferrer" className="btn-primary">
+                  {hero?.cta_text || "Book a Free Class"}
+                </a>
+                <Link href="/services" className={hasBanner ? "btn-secondary bg-white/95 hover:bg-white border-white/95" : "btn-secondary"}>
+                  View Services
+                </Link>
+                <a href={`tel:${SITE.phone}`} className={hasBanner ? "btn-secondary bg-white/95 hover:bg-white border-white/95" : "btn-secondary"}>
+                  Call {SITE.phone}
+                </a>
+              </div>
             </div>
           </div>
-        </div>
-
-        {/* Banner is part of the hero but rendered outside container-narrow
-            so it spans the FULL viewport width edge-to-edge, like a proper
-            hero banner, instead of being boxed into the narrow text column's
-            max-width. The banner's own component handles showing the
-            complete image/video (no cropping) and staying responsive. */}
-        <div className="mt-6">
-          <HomeBanner />
         </div>
       </section>
 

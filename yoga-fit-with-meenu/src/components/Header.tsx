@@ -12,7 +12,18 @@ const FALLBACK_NAV = [
   { id: "fallback-contact", href: "/contact", label: "Contact" },
 ];
 
-export async function Header() {
+type HeaderProps = {
+  // When true, the header renders transparent (no background/border) and
+  // absolutely positioned so it floats on top of whatever sits behind it,
+  // instead of taking up its own row in normal document flow. This is used
+  // ONLY by the homepage, where a full-bleed banner image renders behind
+  // the header. Every other page calls <Header /> with no props, which
+  // renders exactly as before (solid sticky bar, its own row) — this prop
+  // is opt-in and changes nothing for existing callers.
+  overlay?: boolean;
+};
+
+export async function Header({ overlay = false }: HeaderProps = {}) {
   let navItems: { id: string; href: string; label: string; is_external?: number }[] = FALLBACK_NAV;
   try {
     const items = await getActiveNavigation("main");
@@ -23,10 +34,19 @@ export async function Header() {
     navItems = FALLBACK_NAV;
   }
 
+  const headerClass = overlay
+    ? "absolute top-0 left-0 right-0 z-40"
+    : "sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80";
+
+  const linkClass = overlay ? "text-white/90 hover:text-white transition-colors [text-shadow:0_1px_3px_rgb(0_0_0_/_0.5)]" : "text-muted hover:text-foreground transition-colors";
+  const brandClass = overlay
+    ? "font-semibold text-lg text-white tracking-tight [text-shadow:0_1px_3px_rgb(0_0_0_/_0.5)]"
+    : "font-semibold text-lg text-primary tracking-tight";
+
   return (
-    <header className="sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+    <header className={headerClass}>
       <div className="container-narrow flex h-16 items-center justify-between gap-4">
-        <Link href="/" className="font-semibold text-lg text-primary tracking-tight">
+        <Link href="/" className={brandClass}>
           {SITE.name}
         </Link>
 
@@ -37,7 +57,7 @@ export async function Header() {
               href={item.href}
               target={item.is_external ? "_blank" : undefined}
               rel={item.is_external ? "noopener noreferrer" : undefined}
-              className="text-muted hover:text-foreground transition-colors"
+              className={linkClass}
             >
               {item.label}
             </Link>
@@ -51,7 +71,7 @@ export async function Header() {
           <Link href="/free-class" className="btn-primary text-sm py-2 px-3">
             Free Class
           </Link>
-          <MobileNav items={navItems} />
+          <MobileNav items={navItems} overlay={overlay} />
         </div>
       </div>
     </header>

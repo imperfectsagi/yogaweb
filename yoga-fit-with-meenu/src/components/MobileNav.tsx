@@ -7,7 +7,7 @@ import { Menu, X } from "lucide-react";
 
 type NavItem = { id: string; href: string; label: string; is_external?: number };
 
-export function MobileNav({ items }: { items: NavItem[] }) {
+export function MobileNav({ items, overlay = false }: { items: NavItem[]; overlay?: boolean }) {
   const [open, setOpen] = useState(false);
   // Portal target must be resolved client-side after mount (no `document`
   // during SSR); this also naturally gates the portal render until
@@ -83,12 +83,22 @@ export function MobileNav({ items }: { items: NavItem[] }) {
 
   return (
     <>
+      {/* `overlay` only changes the trigger icon's color, so it stays
+          visible when this sits inside a transparent header floating over
+          a photo (homepage hero banner). The drawer itself (opened below)
+          is unaffected — it's portaled to document.body and always has
+          its own solid white background regardless of where the trigger
+          button lives. */}
       <button
         type="button"
         onClick={() => setOpen(true)}
         aria-label="Open menu"
         aria-expanded={open}
-        className="flex h-10 w-10 items-center justify-center rounded-button text-foreground hover:bg-primary/5"
+        className={
+          overlay
+            ? "flex h-10 w-10 items-center justify-center rounded-button text-white [filter:drop-shadow(0_1px_3px_rgb(0_0_0_/_0.5))] hover:bg-white/10"
+            : "flex h-10 w-10 items-center justify-center rounded-button text-foreground hover:bg-primary/5"
+        }
       >
         <Menu className="h-5 w-5" />
       </button>
