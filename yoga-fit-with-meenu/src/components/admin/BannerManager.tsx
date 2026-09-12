@@ -24,7 +24,9 @@ const DEFAULT_BANNER: Banner = {
   altText: null,
   focalX: 50,
   focalY: 50,
-  fit: "cover",
+  // "contain" shows the complete uploaded image by default (no cropping);
+  // admins can switch to "cover" below if they want an edge-to-edge crop.
+  fit: "contain",
 };
 
 export function BannerManager() {
@@ -124,7 +126,7 @@ export function BannerManager() {
         altText: altText || null,
         focalX: 50,
         focalY: 50,
-        fit: "cover",
+        fit: "contain",
       };
 
       await persistBanner(newBanner);
@@ -215,8 +217,8 @@ export function BannerManager() {
               onChange={(e) => setBanner((b) => ({ ...b, fit: e.target.value as "cover" | "contain" }))}
               className="rounded border border-border px-2 py-1.5 text-sm"
             >
-              <option value="cover">Cover (fill area, crop edges)</option>
-              <option value="contain">Contain (show whole image, may letterbox)</option>
+              <option value="contain">Show full image (recommended — may letterbox)</option>
+              <option value="cover">Fill area (crops edges to remove empty space)</option>
             </select>
             <button
               type="button"

@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
     altText: parsed.data.altText || null,
     focalX: parsed.data.focalX ?? 50,
     focalY: parsed.data.focalY ?? 50,
-    fit: parsed.data.fit || "cover",
+    fit: parsed.data.fit || "contain",
   });
 
   return NextResponse.json({ ok: true });

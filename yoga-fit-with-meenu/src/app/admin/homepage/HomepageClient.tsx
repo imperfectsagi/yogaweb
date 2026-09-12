@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { AdminPageHeader, AdminAlert, AdminCard, Field, TextInput, TextArea, Toggle } from "@/components/admin/AdminUI";
+import { AdminPageHeader, AdminAlert, AdminCard, Field, TextInput, TextArea } from "@/components/admin/AdminUI";
 import { MediaPicker } from "@/components/admin/MediaPicker";
 import type { HomepageSectionRow } from "@/lib/cms";
 import { ChevronDown, ChevronUp } from "lucide-react";
@@ -26,6 +26,7 @@ export function HomepageClient({ initialSections }: { initialSections: HomepageS
   );
   const [openId, setOpenId] = useState<string | null>(null);
   const [saving, setSaving] = useState<string | null>(null);
+  const [togglingId, setTogglingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
@@ -33,32 +34,60 @@ export function HomepageClient({ initialSections }: { initialSections: HomepageS
     setSections((prev) => prev.map((s) => (s.id === id ? { ...s, ...patch } : s)));
   }
 
+  async function persistSection(section: HomepageSectionRow) {
+    const res = await fetch(`/api/admin/homepage/${section.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        enabled: !!section.enabled,
+        sort_order: section.sort_order,
+        heading: section.heading,
+        description: section.description,
+        image_url: section.image_url,
+        cta_text: section.cta_text,
+        cta_url: section.cta_url,
+      }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || "Could not save section.");
+  }
+
+  // The visibility switch on the collapsed row saves immediately on its
+  // own — an admin flipping "show/hide this section" shouldn't have to
+  // also expand the row and press a separate "Save section" button to
+  // make that stick. Editing heading/description/CTA still uses the
+  // explicit Save button below, since those are multi-field edits.
+  async function handleToggleEnabled(section: HomepageSectionRow) {
+    const next = { ...section, enabled: section.enabled ? 0 : 1 };
+    setTogglingId(section.id);
+    setError(null);
+    setSuccess(null);
+    updateLocal(section.id, { enabled: next.enabled });
+    try {
+      await persistSection(next);
+      setSuccess(
+        `"${SECTION_LABELS[section.section_key] || section.section_key}" is now ${
+          next.enabled ? "visible" : "hidden"
+        } on the homepage.`
+      );
+    } catch (e) {
+      // Roll back the optimistic UI update if the save failed.
+      updateLocal(section.id, { enabled: section.enabled });
+      setError(e instanceof Error ? e.message : "Could not update visibility.");
+    } finally {
+      setTogglingId(null);
+    }
+  }
+
   async function handleSave(section: HomepageSectionRow) {
     setSaving(section.id);
     setError(null);
     setSuccess(null);
     try {
-      const res = await fetch(`/api/admin/homepage/${section.id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          enabled: !!section.enabled,
-          sort_order: section.sort_order,
-          heading: section.heading,
-          description: section.description,
-          image_url: section.image_url,
-          cta_text: section.cta_text,
-          cta_url: section.cta_url,
-        }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        setError(data.error || "Could not save section.");
-        return;
-      }
+      await persistSection(section);
       setSuccess(`"${SECTION_LABELS[section.section_key] || section.section_key}" saved.`);
-    } catch {
-      setError("Network error. Please try again.");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not save section.");
     } finally {
       setSaving(null);
     }
@@ -76,31 +105,58 @@ export function HomepageClient({ initialSections }: { initialSections: HomepageS
       <div className="space-y-3">
         {sections.map((section) => {
           const isOpen = openId === section.id;
+          const label = SECTION_LABELS[section.section_key] || section.section_key;
           return (
             <AdminCard key={section.id} className="p-0 overflow-hidden">
-              <button
-                type="button"
-                onClick={() => setOpenId(isOpen ? null : section.id)}
-                className="flex w-full items-center justify-between gap-3 p-4 text-left"
-              >
-                <div className="min-w-0">
-                  <p className="font-medium">
-                    {SECTION_LABELS[section.section_key] || section.section_key}
-                  </p>
-                  <p className="text-xs text-muted truncate">
-                    {section.enabled ? "Visible" : "Hidden"} · Order {section.sort_order}
-                  </p>
+              <div className="flex w-full items-center gap-3 p-4">
+                <button
+                  type="button"
+                  onClick={() => setOpenId(isOpen ? null : section.id)}
+                  className="flex min-w-0 flex-1 items-center gap-3 text-left"
+                  aria-expanded={isOpen}
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="font-medium">{label}</p>
+                    <p className="text-xs text-muted truncate">Order {section.sort_order}</p>
+                  </div>
+                  {isOpen ? <ChevronUp className="h-4 w-4 shrink-0" /> : <ChevronDown className="h-4 w-4 shrink-0" />}
+                </button>
+
+                {/* Visible ON/OFF switch right on the row — saves immediately,
+                    with an explicit ON/OFF text label so the current state
+                    is never ambiguous, independent of the accordion. */}
+                <div className="flex shrink-0 items-center gap-2 border-l border-border pl-3">
+                  <span
+                    className={`text-xs font-semibold ${section.enabled ? "text-primary" : "text-muted"}`}
+                  >
+                    {section.enabled ? "ON" : "OFF"}
+                  </span>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={!!section.enabled}
+                    aria-label={`${section.enabled ? "Hide" : "Show"} ${label} on the homepage`}
+                    onClick={() => handleToggleEnabled(section)}
+                    disabled={togglingId === section.id}
+                    className={`relative h-6 w-11 shrink-0 rounded-full transition-colors disabled:opacity-50 ${
+                      section.enabled ? "bg-primary" : "bg-gray-300"
+                    }`}
+                  >
+                    <span
+                      className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${
+                        section.enabled ? "translate-x-5" : "translate-x-0.5"
+                      }`}
+                    />
+                  </button>
                 </div>
-                {isOpen ? <ChevronUp className="h-4 w-4 shrink-0" /> : <ChevronDown className="h-4 w-4 shrink-0" />}
-              </button>
+              </div>
 
               {isOpen && (
                 <div className="space-y-4 border-t border-border p-4">
-                  <Toggle
-                    checked={!!section.enabled}
-                    onChange={(v) => updateLocal(section.id, { enabled: v ? 1 : 0 })}
-                    label="Show this section on the homepage"
-                  />
+                  <p className="text-xs text-muted -mt-1">
+                    Visibility is controlled by the ON/OFF switch above — it saves
+                    instantly. The fields below are extra content for this section.
+                  </p>
                   <Field label="Heading" htmlFor={`heading-${section.id}`}>
                     <TextInput
                       id={`heading-${section.id}`}

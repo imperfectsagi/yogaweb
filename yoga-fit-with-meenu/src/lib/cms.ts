@@ -459,6 +459,126 @@ export async function getPublishedTestimonials(): Promise<TestimonialRow[]> {
 }
 
 // ---------------------------------------------------------------------------
+// Package reviews (admin: sees every status, can create/edit/delete/moderate)
+// ---------------------------------------------------------------------------
+
+export type PackageReviewRow = {
+  id: string;
+  package_id: string;
+  customer_name: string;
+  rating: number;
+  review_text: string;
+  images_json: string | null;
+  status: "pending" | "approved" | "rejected";
+  is_admin_created: number;
+  admin_note: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+/** Admin list view also joins the package name so the list screen doesn't
+ * need a second round-trip per row. */
+export type PackageReviewWithPackage = PackageReviewRow & { package_name: string | null };
+
+export async function adminListPackageReviews(): Promise<PackageReviewWithPackage[]> {
+  const db = getDb();
+  const { results } = await db
+    .prepare(
+      `SELECT r.*, p.name as package_name
+       FROM package_reviews r
+       LEFT JOIN packages p ON p.id = r.package_id
+       ORDER BY
+         CASE r.status WHEN 'pending' THEN 0 WHEN 'approved' THEN 1 ELSE 2 END,
+         r.created_at DESC`
+    )
+    .all<PackageReviewWithPackage>();
+  return results || [];
+}
+
+export async function adminGetPackageReview(id: string): Promise<PackageReviewRow | null> {
+  const db = getDb();
+  return db.prepare(`SELECT * FROM package_reviews WHERE id = ?`).bind(id).first<PackageReviewRow>();
+}
+
+export type PackageReviewInput = {
+  package_id: string;
+  customer_name: string;
+  rating: number;
+  review_text: string;
+  images_json: string | null;
+  status: "pending" | "approved" | "rejected";
+  admin_note: string | null;
+};
+
+/** Reviews created here (from Admin → Reviews → New) are marked
+ * is_admin_created = 1 and default to 'approved' unless a different status
+ * is explicitly requested, since an admin typing a review in directly is
+ * presumed to already be a real, vetted review — not something awaiting
+ * moderation the way a public form submission is. */
+export async function adminCreatePackageReview(data: PackageReviewInput): Promise<string> {
+  const db = getDb();
+  const id = `rev-${crypto.randomUUID().slice(0, 8)}`;
+  await db
+    .prepare(
+      `INSERT INTO package_reviews (id, package_id, customer_name, rating, review_text, images_json, status, is_admin_created, admin_note)
+       VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)`
+    )
+    .bind(
+      id,
+      data.package_id,
+      data.customer_name,
+      data.rating,
+      data.review_text,
+      data.images_json,
+      data.status,
+      data.admin_note
+    )
+    .run();
+  return id;
+}
+
+export async function adminUpdatePackageReview(id: string, data: PackageReviewInput): Promise<void> {
+  const db = getDb();
+  await db
+    .prepare(
+      `UPDATE package_reviews SET
+        package_id = ?, customer_name = ?, rating = ?, review_text = ?,
+        images_json = ?, status = ?, admin_note = ?, updated_at = datetime('now')
+       WHERE id = ?`
+    )
+    .bind(
+      data.package_id,
+      data.customer_name,
+      data.rating,
+      data.review_text,
+      data.images_json,
+      data.status,
+      data.admin_note,
+      id
+    )
+    .run();
+}
+
+/** Lightweight status-only update for the Approve/Reject quick actions on
+ * the list screen, so a moderator doesn't need to open the full edit form
+ * just to approve a review. */
+export async function adminSetPackageReviewStatus(
+  id: string,
+  status: "pending" | "approved" | "rejected"
+): Promise<void> {
+  const db = getDb();
+  await db
+    .prepare(`UPDATE package_reviews SET status = ?, updated_at = datetime('now') WHERE id = ?`)
+    .bind(status, id)
+    .run();
+}
+
+export async function adminDeletePackageReview(id: string): Promise<void> {
+  const db = getDb();
+  await db.prepare(`DELETE FROM package_reviews WHERE id = ?`).bind(id).run();
+}
+
+// ---------------------------------------------------------------------------
 // Blog posts + categories
 // ---------------------------------------------------------------------------
 

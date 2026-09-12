@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import { buildMetadata } from "@/lib/seo";
 import { SITE, whatsappUrl } from "@/lib/utils";
-import { getActivePackages } from "@/lib/db";
+import { getActivePackages, getApprovedReviewsByPackage, type PublicPackageReview } from "@/lib/db";
+import { PackageReviews } from "@/components/PackageReviews";
+import { StarRating } from "@/components/StarRating";
 
 export const metadata: Metadata = buildMetadata({
   title: "Pricing & Packages | Yoga Fit with Meenu",
@@ -35,6 +37,13 @@ export default async function PricingPage() {
     packages = [];
   }
 
+  let reviewsByPackage: Record<string, PublicPackageReview[]> = {};
+  try {
+    reviewsByPackage = await getApprovedReviewsByPackage();
+  } catch {
+    reviewsByPackage = {};
+  }
+
   return (
     <div className="section">
       <div className="container-narrow">
@@ -47,6 +56,9 @@ export default async function PricingPage() {
           <div className="grid md:grid-cols-3 gap-6">
             {packages.map((pkg) => {
               const features: string[] = pkg.features_json ? JSON.parse(pkg.features_json) : [];
+              const reviews = reviewsByPackage[pkg.id] || [];
+              const average =
+                reviews.length > 0 ? reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length : 0;
               return (
                 <div
                   key={pkg.id}
@@ -54,6 +66,14 @@ export default async function PricingPage() {
                 >
                   {!!pkg.is_popular && <span className="text-xs font-medium text-primary mb-2">Popular</span>}
                   <h2 className="text-xl font-medium">{pkg.name}</h2>
+                  {reviews.length > 0 && (
+                    <div className="mt-1 flex items-center gap-1.5">
+                      <StarRating rating={average} size={3} />
+                      <span className="text-xs text-muted">
+                        {average.toFixed(1)} ({reviews.length})
+                      </span>
+                    </div>
+                  )}
                   <p className="mt-2 text-2xl font-semibold text-primary">
                     {formatPrice(pkg.price, pkg.currency)}
                     {pkg.original_price && pkg.original_price > pkg.price && (
@@ -78,6 +98,8 @@ export default async function PricingPage() {
                   >
                     {pkg.cta_text || "Enquire"}
                   </a>
+
+                  <PackageReviews packageId={pkg.id} packageName={pkg.name} reviews={reviews} />
                 </div>
               );
             })}

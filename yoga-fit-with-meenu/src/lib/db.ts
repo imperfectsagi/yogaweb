@@ -89,6 +89,78 @@ export async function getActivePackages() {
   return results || [];
 }
 
+// ---------------------------------------------------------------------------
+// Package reviews (public-facing: approved only)
+// ---------------------------------------------------------------------------
+
+export type PublicPackageReview = {
+  id: string;
+  package_id: string;
+  customer_name: string;
+  rating: number;
+  review_text: string;
+  images_json: string | null;
+  created_at: string;
+};
+
+/** Approved reviews for a single package, newest first. */
+export async function getApprovedReviewsForPackage(packageId: string): Promise<PublicPackageReview[]> {
+  const db = getDb();
+  const { results } = await db
+    .prepare(
+      `SELECT id, package_id, customer_name, rating, review_text, images_json, created_at
+       FROM package_reviews WHERE package_id = ? AND status = 'approved'
+       ORDER BY created_at DESC`
+    )
+    .bind(packageId)
+    .all<PublicPackageReview>();
+  return results || [];
+}
+
+/** Approved reviews for every package in one query, grouped by package_id.
+ * Used on the pricing page so it doesn't need one query per package. */
+export async function getApprovedReviewsByPackage(): Promise<Record<string, PublicPackageReview[]>> {
+  const db = getDb();
+  const { results } = await db
+    .prepare(
+      `SELECT id, package_id, customer_name, rating, review_text, images_json, created_at
+       FROM package_reviews WHERE status = 'approved'
+       ORDER BY created_at DESC`
+    )
+    .all<PublicPackageReview>();
+  const grouped: Record<string, PublicPackageReview[]> = {};
+  for (const r of results || []) {
+    (grouped[r.package_id] ||= []).push(r);
+  }
+  return grouped;
+}
+
+export async function createPackageReview(data: {
+  package_id: string;
+  customer_name: string;
+  rating: number;
+  review_text: string;
+  images_json?: string | null;
+}): Promise<string> {
+  const db = getDb();
+  const id = crypto.randomUUID();
+  await db
+    .prepare(
+      `INSERT INTO package_reviews (id, package_id, customer_name, rating, review_text, images_json, status, is_admin_created)
+       VALUES (?, ?, ?, ?, ?, ?, 'pending', 0)`
+    )
+    .bind(
+      id,
+      data.package_id,
+      data.customer_name,
+      data.rating,
+      data.review_text,
+      data.images_json || null
+    )
+    .run();
+  return id;
+}
+
 export async function getPublishedPosts(limit = 10) {
   const db = getDb();
   const { results } = await db
@@ -261,7 +333,11 @@ export async function getBannerSettings(): Promise<BannerSettings> {
     altText: map.banner_alt_text || null,
     focalX: map.banner_focal_x ? Number(map.banner_focal_x) : 50,
     focalY: map.banner_focal_y ? Number(map.banner_focal_y) : 50,
-    fit: (map.banner_fit as "cover" | "contain") || "cover",
+    // Defaults to "contain" (show the full image) for any banner saved
+    // before this field existed in D1, so an already-live banner switches
+    // to the non-cropping behavior automatically rather than staying
+    // cropped until an admin happens to resave it.
+    fit: (map.banner_fit as "cover" | "contain") || "contain",
   };
 }
 
@@ -449,6 +525,16 @@ export async function findMediaUsage(url: string): Promise<string[]> {
     .bind(url)
     .all<{ name: string }>();
   for (const t of testimonials.results || []) usages.push(`Testimonial: ${t.name}`);
+
+  // Package review images are stored as a JSON array rather than a single
+  // column, so a plain `= ?` match won't find them — LIKE against the raw
+  // JSON text is a safe, good-enough check for this admin warning (it can
+  // only under- or over-warn, never silently delete something in use).
+  const reviewImages = await db
+    .prepare(`SELECT customer_name FROM package_reviews WHERE images_json LIKE ?`)
+    .bind(`%${url}%`)
+    .all<{ customer_name: string }>();
+  for (const r of reviewImages.results || []) usages.push(`Package review photo: ${r.customer_name}`);
 
   const seo = await db
     .prepare(`SELECT id FROM seo_settings WHERE id = 1 AND (default_og_image = ? OR logo_url = ?)`)

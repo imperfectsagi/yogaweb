@@ -3,17 +3,18 @@ import Link from "next/link";
 import { getSession } from "@/lib/auth";
 import { getDb } from "@/lib/db";
 import { AdminShell } from "@/components/admin/AdminShell";
-import { Layers, DollarSign, HelpCircle, Newspaper, Users, MessageSquareQuote } from "lucide-react";
+import { Layers, DollarSign, HelpCircle, Newspaper, Users, MessageSquareQuote, Star } from "lucide-react";
 
 async function getCounts() {
   const db = getDb();
-  const [services, packages, faqs, posts, leads, testimonials] = await Promise.all([
+  const [services, packages, faqs, posts, leads, testimonials, pendingReviews] = await Promise.all([
     db.prepare(`SELECT COUNT(*) as c FROM services`).first<{ c: number }>(),
     db.prepare(`SELECT COUNT(*) as c FROM packages`).first<{ c: number }>(),
     db.prepare(`SELECT COUNT(*) as c FROM faqs`).first<{ c: number }>(),
     db.prepare(`SELECT COUNT(*) as c FROM blog_posts`).first<{ c: number }>(),
     db.prepare(`SELECT COUNT(*) as c FROM leads WHERE status = 'new'`).first<{ c: number }>(),
     db.prepare(`SELECT COUNT(*) as c FROM testimonials`).first<{ c: number }>(),
+    db.prepare(`SELECT COUNT(*) as c FROM package_reviews WHERE status = 'pending'`).first<{ c: number }>(),
   ]);
   return {
     services: services?.c ?? 0,
@@ -22,6 +23,7 @@ async function getCounts() {
     posts: posts?.c ?? 0,
     newLeads: leads?.c ?? 0,
     testimonials: testimonials?.c ?? 0,
+    pendingReviews: pendingReviews?.c ?? 0,
   };
 }
 
@@ -29,7 +31,7 @@ export default async function AdminDashboard() {
   const session = await getSession().catch(() => null);
   if (!session) redirect("/admin/login");
 
-  let counts = { services: 0, packages: 0, faqs: 0, posts: 0, newLeads: 0, testimonials: 0 };
+  let counts = { services: 0, packages: 0, faqs: 0, posts: 0, newLeads: 0, testimonials: 0, pendingReviews: 0 };
   try {
     counts = await getCounts();
   } catch {
@@ -42,6 +44,13 @@ export default async function AdminDashboard() {
     { title: "FAQs", value: counts.faqs, href: "/admin/faq", icon: HelpCircle },
     { title: "Blog Posts", value: counts.posts, href: "/admin/blog", icon: Newspaper },
     { title: "Testimonials", value: counts.testimonials, href: "/admin/testimonials", icon: MessageSquareQuote },
+    {
+      title: "Pending Reviews",
+      value: counts.pendingReviews,
+      href: "/admin/reviews",
+      icon: Star,
+      highlight: counts.pendingReviews > 0,
+    },
     { title: "New Leads", value: counts.newLeads, href: "/admin/leads", icon: Users, highlight: counts.newLeads > 0 },
   ];
 
