@@ -13,13 +13,6 @@ import {
 } from "@/lib/db";
 import { getPublishedTestimonials } from "@/lib/cms";
 
-// The banner and several sections are admin-managed and stored in D1, so the
-// homepage is rendered per-request (via the Worker) rather than statically
-// at build time. This keeps content up to date immediately after an admin
-// saves a change, while Cloudflare's edge cache/CDN still keeps repeat
-// views fast.
-export const dynamic = "force-dynamic";
-
 const freeClassMsg = "Hi Meenu, I would like to attend a free yoga class. Please share the details.";
 
 type Section = {
