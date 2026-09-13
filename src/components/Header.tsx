@@ -86,7 +86,7 @@ export async function Header({ overlay = false, navColor }: HeaderProps = {}) {
               before. With no logo uploaded at all, the text still shows
               everywhere (mobile + desktop) — the original fallback
               behavior is unchanged. */}
-          <span className={logoUrl ? "hidden md:inline" : undefined}>{SITE.name}</span>
+          <span className={logoUrl ? "hidden" : undefined}>{SITE.name}</span>
         </Link>
 
         <nav className="hidden md:flex items-center gap-6 text-sm" aria-label="Main">
