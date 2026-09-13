@@ -53,7 +53,7 @@ export default async function PricingPage() {
         {packages.length === 0 ? (
           <p className="text-muted">Pricing details will be available here soon. Please contact us directly for current rates.</p>
         ) : (
-          <div className="grid md:grid-cols-3 gap-6">
+          <div className="grid md:grid-cols-3 gap-6 items-start">
             {packages.map((pkg) => {
               const features: string[] = pkg.features_json ? JSON.parse(pkg.features_json) : [];
               const reviews = reviewsByPackage[pkg.id] || [];
@@ -62,7 +62,7 @@ export default async function PricingPage() {
               return (
                 <div
                   key={pkg.id}
-                  className={`rounded-card border bg-white p-6 flex flex-col ${pkg.is_popular ? "border-primary shadow-md" : "border-border"}`}
+                  className={`rounded-card border bg-white p-6 flex flex-col self-start ${pkg.is_popular ? "border-primary shadow-md" : "border-border"}`}
                 >
                   {!!pkg.is_popular && <span className="text-xs font-medium text-primary mb-2">Popular</span>}
                   <h2 className="text-xl font-medium">{pkg.name}</h2>

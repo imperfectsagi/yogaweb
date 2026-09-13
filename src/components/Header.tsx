@@ -21,9 +21,16 @@ type HeaderProps = {
   // renders exactly as before (solid sticky bar, its own row) — this prop
   // is opt-in and changes nothing for existing callers.
   overlay?: boolean;
+  // Optional admin-configured HEX override for the nav link text color,
+  // applied only when overlay is true (i.e. only on the homepage hero,
+  // where these settings apply). Undefined means "no override" — the
+  // existing white/text-shadow overlay styling below is unchanged, which
+  // is also exactly what every non-homepage caller gets since they never
+  // pass this prop at all.
+  navColor?: string;
 };
 
-export async function Header({ overlay = false }: HeaderProps = {}) {
+export async function Header({ overlay = false, navColor }: HeaderProps = {}) {
   let navItems: { id: string; href: string; label: string; is_external?: number }[] = FALLBACK_NAV;
   try {
     const items = await getActiveNavigation("main");
@@ -53,6 +60,9 @@ export async function Header({ overlay = false }: HeaderProps = {}) {
   const brandClass = overlay
     ? "font-semibold text-lg text-white tracking-tight [text-shadow:0_1px_3px_rgb(0_0_0_/_0.5)]"
     : "font-semibold text-lg text-primary tracking-tight";
+  // Only applied in overlay mode — navColor is never passed by non-hero
+  // callers, so every other page's nav links are completely unaffected.
+  const navLinkStyle = overlay && navColor ? { color: navColor } : undefined;
 
   return (
     <header className={headerClass}>
@@ -68,7 +78,15 @@ export async function Header({ overlay = false }: HeaderProps = {}) {
             // eslint-disable-next-line @next/next/no-img-element
             <img src={logoUrl} alt={SITE.name} className="h-9 w-auto max-w-[160px] object-contain" />
           )}
-          <span>{SITE.name}</span>
+          {/* Brand text: once a logo is uploaded, the logo alone carries
+              the branding on mobile — showing the text next to it there
+              duplicated the brand name in a cramped space. On desktop
+              (md and up) there's room for both, so the text keeps showing
+              there regardless of whether a logo is set, exactly as
+              before. With no logo uploaded at all, the text still shows
+              everywhere (mobile + desktop) — the original fallback
+              behavior is unchanged. */}
+          <span className={logoUrl ? "hidden md:inline" : undefined}>{SITE.name}</span>
         </Link>
 
         <nav className="hidden md:flex items-center gap-6 text-sm" aria-label="Main">
@@ -79,6 +97,7 @@ export async function Header({ overlay = false }: HeaderProps = {}) {
               target={item.is_external ? "_blank" : undefined}
               rel={item.is_external ? "noopener noreferrer" : undefined}
               className={linkClass}
+              style={navLinkStyle}
             >
               {item.label}
             </Link>

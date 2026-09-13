@@ -7,6 +7,7 @@ import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { MobileCTA } from "@/components/MobileCTA";
 import { FaqAccordion } from "@/components/FaqAccordion";
+import { TestimonialsSection } from "@/components/TestimonialsSection";
 import {
   getHomepageSections,
   getPublishedServices,
@@ -15,7 +16,7 @@ import {
   getPublishedPosts,
   getBannerSettings,
 } from "@/lib/db";
-import { getPublishedTestimonials, getDefaultWhatsappMessage } from "@/lib/cms";
+import { getPublishedTestimonials, getDefaultWhatsappMessage, getAllSiteSettings, isValidHexColor } from "@/lib/cms";
 
 type Section = {
   section_key: string;
@@ -125,6 +126,36 @@ export default async function HomePage() {
   const location = byKey("location");
   const contactCta = byKey("contact-cta");
 
+  // Admin-configurable homepage/header text colors (Admin → Settings →
+  // Site Settings → Homepage Text Colors). Each is independently
+  // optional: a blank or invalid saved value falls back to `undefined`
+  // here, which means "don't set an inline color at all" — the element
+  // then simply uses its existing className-based default color exactly
+  // as before this feature existed. isValidHexColor is checked again
+  // here (not just at save time) purely as defense-in-depth so a
+  // corrupted/edited-outside-the-admin value can never be written into a
+  // style attribute unvalidated.
+  let heroColors: {
+    headerNav?: string;
+    heroEyebrow?: string;
+    heroHeading?: string;
+    heroDescription?: string;
+    heroCta?: string;
+  } = {};
+  try {
+    const colorSettings = await getAllSiteSettings();
+    const pick = (v?: string) => (v && isValidHexColor(v) ? v : undefined);
+    heroColors = {
+      headerNav: pick(colorSettings.header_nav_text_color),
+      heroEyebrow: pick(colorSettings.hero_eyebrow_text_color),
+      heroHeading: pick(colorSettings.hero_heading_text_color),
+      heroDescription: pick(colorSettings.hero_description_text_color),
+      heroCta: pick(colorSettings.hero_cta_text_color),
+    };
+  } catch {
+    heroColors = {};
+  }
+
   return (
     <>
       {/* When no banner is set, Header renders exactly as it always has:
@@ -157,7 +188,23 @@ export default async function HomePage() {
             <div className="absolute inset-0 -z-10">
               <HomeBanner background />
             </div>
-            <Header overlay />
+            {/* Readability scrim: a subtle dark gradient (stronger at the
+                bottom, where the heading/description/buttons sit, fading
+                to nearly nothing at the top) sitting between the banner
+                image and the text. This is the "minimal readability
+                treatment" the hero text needed — the banner image itself
+                is completely untouched, nothing is replaced or redesigned,
+                and the gradient is deliberately restrained (not a flat
+                dark overlay) so the photo still reads clearly. Text-shadow
+                alone (the previous approach) wasn't reliably enough
+                contrast against bright/busy photo areas; this plus the
+                shadow together is. Sits above the banner (-z-10) but below
+                the header/text content (implicit stacking order below). */}
+            <div
+              className="absolute inset-0 -z-[5] bg-gradient-to-t from-black/55 via-black/20 to-black/0"
+              aria-hidden="true"
+            />
+            <Header overlay navColor={heroColors.headerNav} />
           </>
         )}
 
@@ -170,6 +217,7 @@ export default async function HomePage() {
                     ? "text-sm font-medium text-white mb-2 sm:mb-3 tracking-wide uppercase [text-shadow:0_1px_4px_rgb(0_0_0_/_0.6)]"
                     : "text-sm font-medium text-primary mb-2 sm:mb-3 tracking-wide uppercase"
                 }
+                style={hasBanner && heroColors.heroEyebrow ? { color: heroColors.heroEyebrow } : undefined}
               >
                 Yoga Classes in Delhi NCR
               </p>
@@ -179,6 +227,7 @@ export default async function HomePage() {
                     ? "text-3xl sm:text-4xl md:text-5xl font-semibold text-white leading-tight [text-shadow:0_2px_8px_rgb(0_0_0_/_0.6)]"
                     : "text-3xl sm:text-4xl md:text-5xl font-semibold text-foreground leading-tight"
                 }
+                style={hasBanner && heroColors.heroHeading ? { color: heroColors.heroHeading } : undefined}
               >
                 {hero?.heading || "Yoga Fit with Meenu"}
               </h1>
@@ -188,6 +237,7 @@ export default async function HomePage() {
                     ? "mt-3 sm:mt-4 text-base sm:text-lg text-white/95 max-w-2xl mx-auto [text-shadow:0_1px_4px_rgb(0_0_0_/_0.6)]"
                     : "mt-3 sm:mt-4 text-base sm:text-lg text-muted max-w-2xl mx-auto"
                 }
+                style={hasBanner && heroColors.heroDescription ? { color: heroColors.heroDescription } : undefined}
               >
                 {hero?.description ||
                   "Improve movement, flexibility, strength, mindfulness and general wellbeing through yoga. Group, personal and online classes available."}
@@ -204,6 +254,7 @@ export default async function HomePage() {
                   target="_blank"
                   rel="noopener noreferrer"
                   className="btn-primary w-auto text-center max-sm:min-h-[48px] max-sm:px-4 max-sm:py-2 max-sm:text-sm max-sm:whitespace-nowrap"
+                  style={hasBanner && heroColors.heroCta ? { color: heroColors.heroCta } : undefined}
                 >
                   {hero?.cta_text || "Book a Free Class"}
                 </a>
@@ -331,38 +382,10 @@ export default async function HomePage() {
 
       {/* Testimonials */}
       {isEnabled("testimonials") && testimonials.length > 0 && (
-        <section className="section bg-primary/5">
-          <div className="container-narrow">
-            <h2 className="text-2xl md:text-3xl text-center mb-10">{testimonialsSection?.heading || "What Students Say"}</h2>
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {testimonials.map((t) => (
-                <div key={t.id} className="rounded-card border border-border bg-white p-6 shadow-sm">
-                  <p className="text-sm text-muted leading-relaxed">&ldquo;{t.review}&rdquo;</p>
-                  <div className="mt-4 flex items-center gap-3">
-                    {t.photo_url && (
-                      // Plain <img>, not next/image: this app runs on
-                      // Cloudflare Workers (@opennextjs/cloudflare), which
-                      // doesn't support Next's built-in image optimizer —
-                      // same reasoning as HomeBanner.tsx and the blog
-                      // images above. Fixed circular size keeps this from
-                      // affecting the card's existing layout/spacing.
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={t.photo_url}
-                        alt={t.name}
-                        className="h-10 w-10 rounded-full object-cover shrink-0"
-                      />
-                    )}
-                    <p className="text-sm font-medium">
-                      {t.name}
-                      {t.location && <span className="text-muted font-normal"> · {t.location}</span>}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
+        <TestimonialsSection
+          testimonials={testimonials}
+          heading={testimonialsSection?.heading || "What Students Say"}
+        />
       )}
 
       {/* FAQ */}

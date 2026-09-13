@@ -1029,6 +1029,18 @@ export const SETTINGS_KEYS = [
   "social_facebook",
   "social_youtube",
   "business_hours",
+  // Homepage hero / header text colors (Admin → Site Settings →
+  // Homepage Text Colors). Each is an independent HEX value so changing
+  // one never affects the others, and each is optional — an empty value
+  // means "use the built-in default for this text", so a fresh install
+  // (or a site that never touches this section) renders exactly as
+  // before. Validated as HEX in setHomepageTextColors below; never
+  // trusted/injected into CSS unvalidated.
+  "header_nav_text_color",
+  "hero_eyebrow_text_color",
+  "hero_heading_text_color",
+  "hero_description_text_color",
+  "hero_cta_text_color",
 ] as const;
 
 export type SettingsMap = Record<(typeof SETTINGS_KEYS)[number], string>;
@@ -1045,6 +1057,23 @@ export async function getAllSiteSettings(): Promise<Partial<SettingsMap>> {
     (map as Record<string, string>)[row.key] = row.value;
   }
   return map;
+}
+
+// Used only to cache-bust the favicon <link> when the admin uploads a new
+// one (see generateMetadata in src/app/layout.tsx) — browsers can cache a
+// favicon by URL for the life of a tab or longer, so appending a value
+// that changes whenever the setting is re-saved (this row's own
+// updated_at, already maintained by setSiteSettings below) forces the
+// browser to fetch the new image instead of reusing a stale cached one.
+// Returns null when no favicon has ever been saved, in which case the
+// caller falls back to the static default favicon with no cache-bust
+// needed.
+export async function getFaviconUpdatedAt(): Promise<string | null> {
+  const db = getDb();
+  const row = await db
+    .prepare(`SELECT updated_at FROM site_settings WHERE key = 'site_favicon_url'`)
+    .first<{ updated_at: string }>();
+  return row?.updated_at || null;
 }
 
 // The message pre-filled into WhatsApp when a visitor taps a "Free Class"
@@ -1065,6 +1094,18 @@ export async function getDefaultWhatsappMessage(): Promise<string> {
   } catch {
     return DEFAULT_WHATSAPP_MESSAGE;
   }
+}
+
+// Matches a strict 6-digit HEX color (#RRGGBB) or 3-digit shorthand
+// (#RGB). Deliberately does not accept named colors, rgb()/hsl(), or
+// 8-digit alpha HEX — the admin field is documented as "HEX input" only,
+// and keeping the allowed shape narrow means a value read straight out of
+// site_settings can always be trusted to drop directly into an inline
+// `style` without any risk of CSS injection via saved settings.
+const HEX_COLOR_RE = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
+
+export function isValidHexColor(value: string): boolean {
+  return HEX_COLOR_RE.test(value.trim());
 }
 
 export async function setSiteSettings(values: Partial<SettingsMap>): Promise<void> {

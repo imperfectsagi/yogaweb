@@ -1,6 +1,7 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { ChevronDown, ImageIcon, Loader2, Upload, X } from "lucide-react";
 import { StarRating, StarRatingInput } from "@/components/StarRating";
 import { cn } from "@/lib/utils";
@@ -56,12 +57,24 @@ export function PackageReviews({
   const average =
     reviews.length > 0 ? reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length : 0;
 
+  // Full-size viewer for a review photo. Local to this package's card so
+  // opening a photo here can never affect any other package's card —
+  // consistent with `expanded` above, which is likewise per-instance
+  // state, never shared across packages.
+  const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
+
   return (
     <div className="mt-6 border-t border-border pt-5">
-      <div className="flex items-center justify-between gap-3">
-        <div>
+      {/* items-start + flex-wrap: on a narrow desktop card the rating
+          summary and "Write a review" link used to get squeezed onto one
+          tight row (justify-between forcing them to opposite edges even
+          when the summary line itself wraps). Letting this row wrap
+          keeps both pieces fully readable at any card width instead of
+          overlapping or truncating. */}
+      <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-2">
+        <div className="min-w-0">
           {reviews.length > 0 ? (
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
               <StarRating rating={average} size={4} />
               <span className="text-sm font-medium">{average.toFixed(1)}</span>
               <span className="text-xs text-muted">
@@ -75,7 +88,7 @@ export function PackageReviews({
         <button
           type="button"
           onClick={() => setShowForm((v) => !v)}
-          className="text-xs font-medium text-primary hover:underline"
+          className="shrink-0 text-xs font-medium text-primary hover:underline"
         >
           {showForm ? "Cancel" : "Write a review"}
         </button>
@@ -106,25 +119,32 @@ export function PackageReviews({
           {reviews.map((r) => {
             const images: string[] = r.images_json ? JSON.parse(r.images_json) : [];
             return (
-              <li key={r.id} className="text-sm">
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2">
+              <li key={r.id} className="rounded-card border border-border/70 bg-gray-50/40 p-3 text-sm">
+                <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
+                  <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
                     <span className="font-medium">{r.customer_name}</span>
                     <StarRating rating={r.rating} size={3} />
                   </div>
                   <span className="shrink-0 text-xs text-muted">{timeAgo(r.created_at)}</span>
                 </div>
-                <p className="mt-1 text-muted leading-relaxed">{r.review_text}</p>
+                <p className="mt-1.5 text-muted leading-relaxed">{r.review_text}</p>
                 {images.length > 0 && (
                   <div className="mt-2 flex flex-wrap gap-2">
                     {images.map((src, i) => (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
+                      <button
                         key={i}
-                        src={src}
-                        alt={`Photo from ${r.customer_name}'s review`}
-                        className="h-16 w-16 rounded-button border border-border object-cover"
-                      />
+                        type="button"
+                        onClick={() => setLightboxSrc(src)}
+                        className="block h-16 w-16 shrink-0 overflow-hidden rounded-button border border-border focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+                        aria-label={`View full-size photo from ${r.customer_name}'s review`}
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={src}
+                          alt={`Photo from ${r.customer_name}'s review`}
+                          className="h-full w-full object-cover"
+                        />
+                      </button>
                     ))}
                   </div>
                 )}
@@ -133,7 +153,67 @@ export function PackageReviews({
           })}
         </ul>
       )}
+
+      {lightboxSrc && (
+        <ReviewImageLightbox src={lightboxSrc} onClose={() => setLightboxSrc(null)} />
+      )}
     </div>
+  );
+}
+
+/** Full-size review photo viewer. Portaled to document.body (same
+ * reasoning as MobileNav's drawer: an ancestor with backdrop-blur/filter
+ * would otherwise clip a fixed-position overlay to that ancestor's box
+ * instead of the viewport). Closes on the close button, backdrop click,
+ * or Escape. Purely a display layer — never mutates or re-uploads the
+ * underlying image, so the original uploaded URL is untouched. */
+function ReviewImageLightbox({ src, onClose }: { src: string; onClose: () => void }) {
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [onClose]);
+
+  if (!mounted) return null;
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 p-4"
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Review photo"
+    >
+      <button
+        type="button"
+        onClick={onClose}
+        aria-label="Close"
+        className="absolute right-4 top-4 flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20"
+      >
+        <X className="h-5 w-5" />
+      </button>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={src}
+        alt="Full-size review photo"
+        className="max-h-[85vh] max-w-full rounded-card object-contain shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      />
+    </div>,
+    document.body
   );
 }
 

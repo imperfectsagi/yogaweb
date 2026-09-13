@@ -27,6 +27,61 @@ already configured," not "provision something new."
 
 ---
 
+## 0. What changed in this update (read before deploying)
+
+This drop of the codebase is a **targeted bug-fix pass**, not a redesign.
+Five specific issues were fixed; nothing else was intentionally touched.
+No new Cloudflare resources, no new D1/R2/KV bindings, and **no new
+database migration** are needed for this update — every change below
+either edits existing code or reuses the existing `site_settings`
+key/value table with new keys, which requires no schema change at all.
+
+1. **Mobile header showed the brand name twice.** Once a logo is
+   uploaded (Admin → Site Settings → Branding), the separate text brand
+   name next to it is now hidden on mobile only; desktop is unchanged,
+   and sites with no logo uploaded still show the text everywhere exactly
+   as before.
+2. **Package reviews on the Pricing page (desktop):**
+   - Cleaned up the rating/"Write a review"/"Read All Reviews" row so it
+     no longer crowds or overlaps on desktop widths.
+   - Fixed a CSS Grid issue where expanding one package's reviews made
+     the *neighboring* package card stretch to match its height even
+     though nothing in that neighboring card had changed. Each package
+     card now sizes independently (`items-start` on the grid).
+   - Review photos now open in a full-size lightbox on click/tap (with a
+     close button, backdrop click, and Escape key) instead of only ever
+     showing as a small fixed thumbnail.
+3. **Homepage testimonials:** photos are now noticeably larger (was an
+   almost-invisible 40px circle; now 64px). Only the first 3 testimonials
+   show by default, with a "Read All Testimonials" / "Hide Testimonials"
+   toggle for the rest — no testimonial data is hidden or deleted, only
+   the initial on-screen count.
+4. **Favicon uploaded in Admin never showed up on the live site.** Root
+   cause: a leftover static `src/app/favicon.ico` file (Next.js's
+   "file convention" favicon) was silently overriding the database-driven
+   favicon that Admin → Site Settings → Favicon was correctly saving.
+   That static file has been removed (the same image now lives at
+   `public/favicon-default.ico` as the built-in fallback), and the
+   favicon `<head>` metadata is now cache-busted on every save so
+   browsers can't keep showing a stale cached icon either.
+5. **Homepage hero text readability + new admin color controls:** a
+   subtle gradient scrim now sits between the hero banner photo and the
+   overlaid text (the photo itself is untouched — nothing was replaced or
+   redesigned). Separately, Admin → Site Settings now has a "Homepage
+   Text Colors" section with independent HEX color fields for the header
+   nav, hero eyebrow, hero heading, hero description, and hero CTA text —
+   each optional, each validated as a real HEX code before it can be
+   saved, and none of them touch any button background color or any
+   other page.
+
+If you're redeploying this folder over the existing live site, proceed
+with the normal steps below (1 through 7) — step 5's migration command is
+still safe to run (it's a no-op for this update specifically, since no
+new migration file was added), and step 6's deploy picks up all five
+fixes above automatically.
+
+---
+
 ## 1. This project is already wired to the live resources
 
 Open `wrangler.toml` in this folder. It already contains the **real,

@@ -3,7 +3,10 @@
 import { useState } from "react";
 import { AdminPageHeader, AdminAlert, AdminCard, Field, TextInput, TextArea } from "@/components/admin/AdminUI";
 import { MediaPicker } from "@/components/admin/MediaPicker";
+import { HexColorField } from "@/components/admin/HexColorField";
 import type { SettingsMap } from "@/lib/cms";
+
+const HEX_RE = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
 
 export function SiteSettingsClient({ initialSettings }: { initialSettings: Partial<SettingsMap> }) {
   const [logoUrl, setLogoUrl] = useState<string | null>(initialSettings.site_logo_url || null);
@@ -14,15 +17,44 @@ export function SiteSettingsClient({ initialSettings }: { initialSettings: Parti
   const [youtube, setYoutube] = useState(initialSettings.social_youtube || "");
   const [businessHours, setBusinessHours] = useState(initialSettings.business_hours || "");
 
+  // Homepage text colors — each independent, each optional (empty =
+  // "use the site's built-in default for this text"). See the Homepage
+  // Text Colors card below.
+  const [headerNavColor, setHeaderNavColor] = useState(initialSettings.header_nav_text_color || "");
+  const [heroEyebrowColor, setHeroEyebrowColor] = useState(initialSettings.hero_eyebrow_text_color || "");
+  const [heroHeadingColor, setHeroHeadingColor] = useState(initialSettings.hero_heading_text_color || "");
+  const [heroDescriptionColor, setHeroDescriptionColor] = useState(initialSettings.hero_description_text_color || "");
+  const [heroCtaColor, setHeroCtaColor] = useState(initialSettings.hero_cta_text_color || "");
+
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
-    setSaving(true);
     setError(null);
     setSuccess(null);
+
+    // Client-side HEX validation up front, mirroring the server's own
+    // check — catches mistakes immediately without a round-trip, while
+    // the API route remains the actual source of truth (it re-validates
+    // and rejects independently, since this client check is only a
+    // convenience).
+    const colorFields: [string, string][] = [
+      ["Header navigation text color", headerNavColor],
+      ["Hero eyebrow text color", heroEyebrowColor],
+      ["Hero heading text color", heroHeadingColor],
+      ["Hero description text color", heroDescriptionColor],
+      ["Hero CTA text color", heroCtaColor],
+    ];
+    for (const [label, value] of colorFields) {
+      if (value && !HEX_RE.test(value)) {
+        setError(`${label} must be a valid HEX code, e.g. #2F6657.`);
+        return;
+      }
+    }
+
+    setSaving(true);
     try {
       const res = await fetch("/api/admin/settings/site", {
         method: "POST",
@@ -35,6 +67,11 @@ export function SiteSettingsClient({ initialSettings }: { initialSettings: Parti
           social_facebook: facebook,
           social_youtube: youtube,
           business_hours: businessHours,
+          header_nav_text_color: headerNavColor,
+          hero_eyebrow_text_color: heroEyebrowColor,
+          hero_heading_text_color: heroHeadingColor,
+          hero_description_text_color: heroDescriptionColor,
+          hero_cta_text_color: heroCtaColor,
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -98,6 +135,48 @@ export function SiteSettingsClient({ initialSettings }: { initialSettings: Parti
           <Field label="Business hours" htmlFor="hours" hint="Free text, e.g. 'Mon–Sat, 6am–8pm'.">
             <TextArea id="hours" rows={2} value={businessHours} onChange={(e) => setBusinessHours(e.target.value)} />
           </Field>
+        </AdminCard>
+
+        <AdminCard className="space-y-4">
+          <h2 className="font-medium">Homepage Text Colors</h2>
+          <p className="text-xs text-muted">
+            Controls the header navigation and hero text colors on the homepage banner. Each field
+            is independent — changing one never affects the others. Leave a field blank to use the
+            site&apos;s default color for that text. These do not change any button background
+            colors or other pages.
+          </p>
+          <HexColorField
+            id="color-header-nav"
+            label="Header Navigation Text Color"
+            value={headerNavColor}
+            onChange={setHeaderNavColor}
+          />
+          <HexColorField
+            id="color-hero-eyebrow"
+            label="Hero Eyebrow Text Color"
+            hint="The small uppercase line above the heading, e.g. 'Yoga Classes in Delhi NCR'."
+            value={heroEyebrowColor}
+            onChange={setHeroEyebrowColor}
+          />
+          <HexColorField
+            id="color-hero-heading"
+            label="Hero Heading Text Color"
+            value={heroHeadingColor}
+            onChange={setHeroHeadingColor}
+          />
+          <HexColorField
+            id="color-hero-description"
+            label="Hero Description Text Color"
+            value={heroDescriptionColor}
+            onChange={setHeroDescriptionColor}
+          />
+          <HexColorField
+            id="color-hero-cta"
+            label="Hero CTA Text Color"
+            hint="Text color of the 'Book a Free Class' button on the hero banner only."
+            value={heroCtaColor}
+            onChange={setHeroCtaColor}
+          />
         </AdminCard>
 
         <div className="sticky bottom-0 -mx-4 border-t border-border bg-white px-4 py-3 sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:px-0 sm:py-0">
