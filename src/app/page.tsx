@@ -198,19 +198,19 @@ export default async function HomePage() {
                   stacked instead of the cramped two/three-button wrap that
                   used to appear here; sm:flex-row restores the side-by-side
                   layout once there's enough width for it to look balanced. */}
-              <div className="mt-5 sm:mt-6 flex flex-col sm:flex-row items-center justify-center gap-3">
+              <div className="mt-5 sm:mt-6 flex w-full flex-row items-center justify-center gap-2 sm:gap-3">
                 <a
                   href={whatsappUrl(SITE.whatsapp, freeClassMsg)}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="btn-primary w-full sm:w-auto text-center"
+                  className="btn-primary w-auto text-center max-sm:min-h-[48px] max-sm:px-4 max-sm:py-2 max-sm:text-sm max-sm:whitespace-nowrap"
                 >
                   {hero?.cta_text || "Book a Free Class"}
                 </a>
                 <Link
                   href="/services"
                   className={cn(
-                    "w-full sm:w-auto text-center",
+                    "w-auto text-center max-sm:min-h-[48px] max-sm:px-4 max-sm:py-2 max-sm:text-sm max-sm:whitespace-nowrap",
                     hasBanner ? "btn-secondary bg-white/95 hover:bg-white border-white/95" : "btn-secondary"
                   )}
                 >
