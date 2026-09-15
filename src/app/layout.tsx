@@ -57,6 +57,9 @@ export async function generateMetadata(): Promise<Metadata> {
 
   return {
     ...buildMetadata(),
+    verification: {
+      google: "_8m9gVuvnjtMixqI0udcMO0maYbYcE0Z0oMsksTJ7ZM",
+    },
     metadataBase: new URL(SITE.url),
     // Always set explicitly — either the admin-uploaded favicon or the
     // built-in default — so there's never a fallback to an ambiguous
